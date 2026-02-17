@@ -17,11 +17,25 @@ enum class Screen {
 }
 
 @Composable
-@Preview
 fun App() {
+    // The main entry point for the application. 
+    // ViewModels are instantiated here using the lifecycle-viewmodel-compose factory.
     val localViewModel: VideoViewModel = viewModel { VideoViewModel() }
     val remoteViewModel: RemoteVideoViewModel = viewModel { RemoteVideoViewModel() }
 
+    AppContent(
+        localViewModel = localViewModel,
+        remoteViewModel = remoteViewModel
+    )
+}
+
+@Composable
+fun AppContent(
+    localViewModel: VideoViewModel,
+    remoteViewModel: RemoteVideoViewModel
+) {
+    // UI logic and state management are handled here. 
+    // This allows the Composable to be easily previewed with mock ViewModels.
     var currentScreen by remember { mutableStateOf(Screen.Local) }
     var selectedVideo by remember { mutableStateOf<VideoItem?>(null) }
 
@@ -93,4 +107,40 @@ fun App() {
             }
         }
     }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun AppPreview() {
+    // A mock version of VideoViewModel to safely use in Previews.
+    val mockLocalViewModel = remember {
+        object : VideoViewModel() {
+            override var videos = emptyList<VideoItem>()
+            override var isLoading = false
+            override var isGridView = false
+            override fun loadVideos() {}
+            override fun toggleViewMode() {}
+        }
+    }
+
+    // A mock version of RemoteVideoViewModel to safely use in Previews.
+    val mockRemoteViewModel = remember {
+        object : RemoteVideoViewModel() {
+            override var remoteFiles = emptyList<OpenListItem>()
+            override var isLoading = false
+            override var currentPath = "/"
+            override var pathHistory = emptyList<String>()
+            override var baseUrl = ""
+            override fun updateBaseUrl(url: String) {}
+            override fun loadPath(path: String) {}
+            override fun navigateBack() = false
+            override fun navigateToPath(path: String) {}
+            override suspend fun getFileUrl(path: String): String? = null
+        }
+    }
+
+    AppContent(
+        localViewModel = mockLocalViewModel,
+        remoteViewModel = mockRemoteViewModel
+    )
 }

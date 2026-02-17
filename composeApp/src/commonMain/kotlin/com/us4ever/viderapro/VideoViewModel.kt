@@ -11,19 +11,19 @@ expect class VideoRepository() {
     suspend fun fetchVideos(): List<VideoItem>
 }
 
-class VideoViewModel : ViewModel() {
+open class VideoViewModel : ViewModel() {
     private val repository = VideoRepository()
 
-    var videos by mutableStateOf<List<VideoItem>>(emptyList())
-        private set
+    open var videos by mutableStateOf<List<VideoItem>>(emptyList())
+        protected set
 
-    var isLoading by mutableStateOf(false)
-        private set
+    open var isLoading by mutableStateOf(false)
+        protected set
 
-    var isGridView by mutableStateOf(getSetting("is_grid_view", "false").toBoolean())
-        private set
+    open var isGridView by mutableStateOf(try { getSetting("is_grid_view", "false").toBoolean() } catch(e: Exception) { false })
+        protected set
 
-    fun loadVideos() {
+    open fun loadVideos() {
         viewModelScope.launch {
             isLoading = true
             videos = repository.fetchVideos()
@@ -31,7 +31,7 @@ class VideoViewModel : ViewModel() {
         }
     }
 
-    fun toggleViewMode() {
+    open fun toggleViewMode() {
         isGridView = !isGridView
         saveSetting("is_grid_view", isGridView.toString())
     }

@@ -10,35 +10,41 @@ import kotlinx.coroutines.launch
 expect fun getSetting(key: String, default: String): String
 expect fun saveSetting(key: String, value: String)
 
-class RemoteVideoViewModel : ViewModel() {
+open class RemoteVideoViewModel : ViewModel() {
     private val repository = OpenListRepository()
 
-    var remoteFiles by mutableStateOf<List<OpenListItem>>(emptyList())
-        private set
+    open var remoteFiles by mutableStateOf<List<OpenListItem>>(emptyList())
+        protected set
 
-    var isLoading by mutableStateOf(false)
-        private set
+    open var isLoading by mutableStateOf(false)
+        protected set
 
-    var currentPath by mutableStateOf("/")
-        private set
+    open var currentPath by mutableStateOf("/")
+        protected set
 
-    var pathHistory by mutableStateOf<List<String>>(emptyList())
-        private set
+    open var pathHistory by mutableStateOf<List<String>>(emptyList())
+        protected set
 
-    var baseUrl by mutableStateOf(getSetting("base_url", ""))
-        private set
+    open var baseUrl by mutableStateOf(try { getSetting("base_url", "") } catch (e: Exception) { "" })
+        protected set
 
     init {
-        if (baseUrl.isNotEmpty()) {
-            repository.baseUrl = baseUrl
-            loadPath("/")
+        try {
+            if (baseUrl.isNotEmpty()) {
+                repository.baseUrl = baseUrl
+                loadPath("/")
+            }
+        } catch (e: Exception) {
+            // Silently fail for preview/initialization issues
         }
     }
 
-    fun updateBaseUrl(url: String) {
+    open fun updateBaseUrl(url: String) {
         baseUrl = url
         repository.baseUrl = url
-        saveSetting("base_url", url)
+        try {
+            saveSetting("base_url", url)
+        } catch (e: Exception) {}
 
         if (url.isNotEmpty()) {
             loadPath("/")
@@ -49,7 +55,7 @@ class RemoteVideoViewModel : ViewModel() {
         }
     }
 
-    fun loadPath(path: String) {
+    open fun loadPath(path: String) {
         if (baseUrl.isEmpty()) return
         if (path == currentPath && remoteFiles.isNotEmpty()) return
 
@@ -72,7 +78,7 @@ class RemoteVideoViewModel : ViewModel() {
         }
     }
 
-    fun navigateBack(): Boolean {
+    open fun navigateBack(): Boolean {
         if (pathHistory.isNotEmpty()) {
             val prevPath = pathHistory.last()
             pathHistory = pathHistory.dropLast(1)
@@ -83,7 +89,7 @@ class RemoteVideoViewModel : ViewModel() {
         return false
     }
 
-    fun navigateToPath(path: String) {
+    open fun navigateToPath(path: String) {
         if (path == currentPath) return
 
         val index = pathHistory.indexOf(path)
@@ -96,7 +102,7 @@ class RemoteVideoViewModel : ViewModel() {
         loadPathWithoutHistory(path)
     }
 
-    private fun loadPathWithoutHistory(path: String) {
+    protected open fun loadPathWithoutHistory(path: String) {
         if (baseUrl.isEmpty()) return
         viewModelScope.launch {
             isLoading = true
@@ -113,7 +119,7 @@ class RemoteVideoViewModel : ViewModel() {
         }
     }
 
-    suspend fun getFileUrl(path: String): String? {
+    open suspend fun getFileUrl(path: String): String? {
         if (baseUrl.isEmpty()) return null
         return try {
             val response = repository.getFile(path)
