@@ -1,0 +1,123 @@
+name: Release VideraPro
+
+on:
+  workflow_dispatch: # 支持手动点击运行
+  push:
+    tags:
+      - 'v*' # 当你推送以 v 开头的 tag 时触发 (例如 v1.0.0)
+
+jobs:
+  build-android:
+    name: Build Android
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Get Version
+        id: get_version
+        run: |
+          VERSION="v$(date +'%Y.%m.%d')-${{ github.run_number }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # 运行构建，包含 Lint 检查以确保代码质量
+      - name: Build Android Release APK
+        run: ./gradlew :androidApp:assembleRelease
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VideraPro-Android-APK
+          path: androidApp/build/outputs/apk/release/*.apk
+
+  build-ios:
+    name: Build iOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Install CocoaPods
+        run: |
+          sudo gem install cocoapods
+          pod --version
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Install Pods
+        run: ./gradlew :composeApp:podInstall
+
+      - name: Build iOS Archive
+        run: |
+          xcodebuild -workspace iosApp/iosApp.xcworkspace \
+                     -scheme iosApp \
+                     -sdk iphoneos \
+                     -configuration Release \
+                     archive -archivePath build/iosApp.xcarchive \
+                     CODE_SIGN_IDENTITY="" \
+                     CODE_SIGNING_REQUIRED=NO \
+                     CODE_SIGNING_ALLOWED=NO
+
+      - name: Zip Archive
+        run: zip -r build/VideraPro-iOS-Archive.zip build/iosApp.xcarchive
+
+      - name: Upload iOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VideraPro-iOS-Archive
+          path: build/VideraPro-iOS-Archive.zip
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-android, build-ios]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Android Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: VideraPro-Android-APK
+          path: release-assets
+
+      - name: Download iOS Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: VideraPro-iOS-Archive
+          path: release-assets
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.build-android.outputs.version }}
+          name: Release ${{ needs.build-android.outputs.version }}
+          body: |
+            ## VideraPro 自动构建发布
+            
+            - **Android**: 下载下方 `.apk` 文件即可安装（这是未签名包，部分手机需允许风险安装）。
+            - **iOS**: 提供 `.xcarchive` 源码包。
+          draft: false
+          prerelease: false
+          files: |
+            release-assets/**/*.apk
+            release-assets/**/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
